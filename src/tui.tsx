@@ -6,20 +6,31 @@ import { openManager, openScheduler } from "./tui/dialogs.tsx";
 import { SidebarScheduledPrompts } from "./tui/SidebarScheduledPrompts.tsx";
 
 const tui: TuiPlugin = async (api) => {
-  const disposeCommands = api.keymap.registerLayer({
-    commands: [
-      {
-        namespace: "palette",
-        name: SCHEDULE_COMMAND_OPEN,
-        title: "Schedule Prompt",
-        category: "Plugin",
-        slashName: "schedule",
-        run: () => {
-          void openScheduler(api);
+  const disposeCommands = api.command
+    ? api.command.register(() => [
+        {
+          title: "Schedule Prompt",
+          value: SCHEDULE_COMMAND_OPEN,
+          category: "Plugin",
+          slash: { name: "schedule" },
+          onSelect: () => {
+            void openScheduler(api);
+          },
         },
-      },
-    ],
-  });
+      ])
+    : api.keymap.registerLayer({
+        commands: [
+          {
+            namespace: "palette",
+            name: SCHEDULE_COMMAND_OPEN,
+            title: "Schedule Prompt",
+            category: "Plugin",
+            run: () => {
+              void openScheduler(api);
+            },
+          },
+        ],
+      });
 
   api.slots.register({
     order: 180,

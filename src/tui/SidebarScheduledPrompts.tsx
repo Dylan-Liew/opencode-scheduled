@@ -1,7 +1,7 @@
 /** @jsxImportSource @opentui/solid */
 import { TextAttributes, type MouseEvent } from "@opentui/core";
 import type { TuiPluginApi } from "@opencode-ai/plugin/tui";
-import { createSignal, For, onCleanup, onMount, Show } from "solid-js";
+import { createSignal, For, onCleanup, Show } from "solid-js";
 import { formatCompactDate, taskID } from "../format.ts";
 import { onSchedulerChange } from "../scheduler-events.ts";
 import { readStore } from "../store.ts";
@@ -26,9 +26,7 @@ export function SidebarScheduledPrompts(props: { api: TuiPluginApi; sessionID: s
     setPaused(store.settings.paused);
   };
 
-  onMount(() => {
-    void refresh();
-  });
+  void refresh();
 
   const timer = setInterval(() => {
     void refresh();
@@ -48,7 +46,7 @@ export function SidebarScheduledPrompts(props: { api: TuiPluginApi; sessionID: s
         flexDirection="row"
         gap={1}
         alignItems="center"
-        onMouseDown={(event: MouseEvent) => {
+        onMouseUp={(event: MouseEvent) => {
           if (clickPrimary(event)) {
             setExpanded((value) => !value);
           }
@@ -72,7 +70,7 @@ export function SidebarScheduledPrompts(props: { api: TuiPluginApi; sessionID: s
                   <box
                     flexDirection="row"
                     gap={1}
-                    onMouseDown={(event: MouseEvent) => {
+                    onMouseUp={(event: MouseEvent) => {
                       if (clickPrimary(event)) {
                         props.onOpenManager();
                       }

@@ -2,7 +2,7 @@
 import { TextAttributes, type KeyEvent, type MouseEvent, type Renderable } from "@opentui/core";
 import { useKeyboard, useTerminalDimensions } from "@opentui/solid";
 import type { TuiPluginApi } from "@opencode-ai/plugin/tui";
-import { createEffect, createSignal, For, onCleanup, onMount, Show } from "solid-js";
+import { createEffect, createSignal, For, onCleanup, Show } from "solid-js";
 import { SCHEDULE_COMMAND_OPEN } from "../constants.ts";
 import { formatCompactDate, taskID } from "../format.ts";
 import type { ScheduledPrompt } from "../types.ts";
@@ -67,16 +67,14 @@ export function SchedulerManagerDialog(props: SchedulerManagerDialogProps) {
     }
   };
 
-  onMount(() => {
-    void loadCurrentJobs();
-    setTimeout(() => {
-      if (!root || root.isDestroyed) {
-        return;
-      }
+  void loadCurrentJobs();
+  setTimeout(() => {
+    if (!root || root.isDestroyed) {
+      return;
+    }
 
-      root.focus();
-    }, 25);
-  });
+    root.focus();
+  }, 25);
 
   createEffect(() => {
     props.api.ui.dialog.setSize(dimensions().width >= 120 ? "large" : "medium");
