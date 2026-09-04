@@ -1,4 +1,5 @@
 export type ScheduleStatus = "pending" | "sent" | "canceled" | "failed";
+export type ScheduleSource = "user" | "agent";
 
 export interface ScheduledPrompt {
   id: string;
@@ -6,6 +7,7 @@ export interface ScheduledPrompt {
   runAt: number;
   createdAt: number;
   status: ScheduleStatus;
+  source?: ScheduleSource;
   sessionID?: string;
   sentAt?: number;
   canceledAt?: number;

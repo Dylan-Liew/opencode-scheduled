@@ -1,9 +1,12 @@
-import { mkdir, readFile, rename, writeFile } from "fs/promises";
+import { mkdir, open, readFile, rename, stat, unlink, writeFile } from "fs/promises";
 import { dirname, join } from "path";
 import { randomUUID } from "crypto";
 import type { ScheduledPrompt, SchedulerStore } from "./types.ts";
 
 const STORE_FILE = "schedules.json";
+const LOCK_RETRY_MS = 25;
+const LOCK_TIMEOUT_MS = 5_000;
+const STALE_LOCK_MS = 30_000;
 
 function stateRoot(): string {
   if (process.env.OPENCODE_SCHEDULED_HOME) {
@@ -51,6 +54,7 @@ function normalizeStore(value: unknown): SchedulerStore {
           typeof job.prompt === "string" &&
           typeof job.runAt === "number" &&
           typeof job.createdAt === "number" &&
+          (job.source === undefined || job.source === "user" || job.source === "agent") &&
           (job.status === "pending" || job.status === "sent" || job.status === "canceled" || job.status === "failed")
         );
       })
@@ -79,7 +83,7 @@ export async function readStore(): Promise<SchedulerStore> {
   }
 }
 
-export async function writeStore(store: SchedulerStore): Promise<void> {
+async function writeStoreFile(store: SchedulerStore): Promise<void> {
   const path = storePath();
   await mkdir(dirname(path), { recursive: true });
   const tempPath = `${path}.${process.pid}.tmp`;
@@ -87,10 +91,66 @@ export async function writeStore(store: SchedulerStore): Promise<void> {
   await rename(tempPath, path);
 }
 
+async function removeStaleLock(lockPath: string): Promise<void> {
+  try {
+    const info = await stat(lockPath);
+    if (Date.now() - info.mtimeMs > STALE_LOCK_MS) {
+      await unlink(lockPath);
+    }
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== "ENOENT") {
+      throw error;
+    }
+  }
+}
+
+async function withStoreLock<Value>(operation: () => Promise<Value>): Promise<Value> {
+  const lockPath = `${storePath()}.lock`;
+  await mkdir(dirname(lockPath), { recursive: true });
+  const startedAt = Date.now();
+  let lock: Awaited<ReturnType<typeof open>> | undefined;
+
+  while (!lock) {
+    try {
+      lock = await open(lockPath, "wx");
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== "EEXIST") {
+        throw error;
+      }
+
+      await removeStaleLock(lockPath);
+      if (Date.now() - startedAt >= LOCK_TIMEOUT_MS) {
+        throw new Error("Timed out waiting for the schedule store lock");
+      }
+
+      await new Promise((resolve) => setTimeout(resolve, LOCK_RETRY_MS));
+    }
+  }
+
+  try {
+    return await operation();
+  } finally {
+    await lock.close();
+    try {
+      await unlink(lockPath);
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== "ENOENT") {
+        throw error;
+      }
+    }
+  }
+}
+
+export async function writeStore(store: SchedulerStore): Promise<void> {
+  await withStoreLock(() => writeStoreFile(store));
+}
+
 export async function updateStore(update: (store: SchedulerStore) => SchedulerStore): Promise<SchedulerStore> {
-  const next = update(await readStore());
-  await writeStore(next);
-  return next;
+  return withStoreLock(async () => {
+    const next = update(await readStore());
+    await writeStoreFile(next);
+    return next;
+  });
 }
 
 export async function saveDraftPrompt(prompt: string): Promise<void> {
@@ -113,13 +173,19 @@ export async function takeDraftPrompt(): Promise<string | undefined> {
   return draft;
 }
 
-export function createScheduledPrompt(input: { prompt: string; runAt: number; sessionID?: string }): ScheduledPrompt {
+export function createScheduledPrompt(input: {
+  prompt: string;
+  runAt: number;
+  sessionID?: string;
+  source?: ScheduledPrompt["source"];
+}): ScheduledPrompt {
   return {
     id: randomUUID(),
     prompt: input.prompt,
     runAt: input.runAt,
     createdAt: Date.now(),
     status: "pending",
+    source: input.source,
     sessionID: input.sessionID,
   };
 }

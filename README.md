@@ -2,6 +2,8 @@
 
 Schedule prompts from inside OpenCode with `/schedule`.
 
+Agents can also schedule one non-recurring follow-up in their current session when the user explicitly requests it.
+
 ## Install
 
 Recommended:
@@ -49,6 +51,8 @@ Open the scheduler with either:
 Inside the dialog, choose when the prompt should be sent, review pending items, and cancel schedules. Pending items are shown by task ID and date.
 
 The sidebar also shows pending prompts for the current session by task ID and date. Use the scheduler dialog to pause or resume delivery. When paused, due prompts stay pending until the scheduler is resumed.
+
+The `schedule_followup` tool is available to agents. It accepts a delay of 1 minute to 7 days and always targets the calling session. Only one agent-created follow-up may be pending per session, and each follow-up is delivered once.
 
 ## Notes
 
